@@ -1,0 +1,28 @@
+[2026-05-23 17:14:00]
+Pano_BoneLoss_Measurement 프로젝트 초기 설정 및 아키텍처 계획 수립 시작.
+PyTorch, FastAPI, OpenCV 기반의 치주염 병기 및 골소실 자동 측정 파이프라인 설계를 진행함.
+초기 작업으로 utils/geometry.py 및 services/staging.py 모듈 작성 계획을 수립하고 사용자의 확인을 대기함.
+
+[2026-05-23 17:16:00]
+사용자의 요청에 따라 프로젝트명을 `Pano_BoneLoss_Measurement`로 확정함.
+`utils/geometry.py`와 `services/staging.py` 모듈 구현 완료. Type Hinting 및 예외 처리를 포함한 코어 로직 작성.
+
+[2026-05-23 17:21:00]
+Phase 2 구현 진행: YOLOv11 기반 치아 OBB 검출기(`models/detector.py`) 및 Swin Transformer 기반 키포인트 예측기(`models/landmark.py`) 구조 구현 완료.
+통합 추론 파이프라인(FastAPI, `api/main.py`) 작성 완료. 모든 모듈이 연결되어 JSON 응답을 반환하도록 설정됨.
+
+[2026-05-23 17:22:00]
+tests/test_geometry.py 및 tests/test_staging.py 단위 테스트 생성.
+모든 파이프라인 구축 완료에 따른 walkthrough.md 산출물 생성 및 task 완료 마킹 처리함.
+
+[2026-05-23 17:23:00]
+Streamlit Cloud 배포를 위한 UI(User Interface) 구축 요구사항 접수.
+FastAPI 분리 없이 내부 모듈을 직접 호출하는 방식의 Streamlit 아키텍처(app.py) 설계를 계획 문서에 추가하고 사용자 확인 대기중.
+
+[2026-05-23 17:34:00]
+사용자 승인 하에 Streamlit 메인 애플리케이션(`app.py`)과 배포용 패키지 목록(`requirements.txt`) 작성 완료.
+프론트엔드-백엔드 딥러닝 모듈 연동 로직까지 구축하여 전체 시스템 뼈대 완성함.
+
+[2026-05-23 18:26:00]
+데이터 확보: 오픈소스 방사선 데이터셋 검색 결과 Zenodo의 'Panoramic Radiography Database' (DOI: 10.5281/zenodo.4457648)를 채택함.
+`download_dataset.py` 스크립트를 작성하여 백그라운드에서 다운로드 및 압축 해제를 진행 중임.
