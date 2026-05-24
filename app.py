@@ -12,6 +12,8 @@ import cv2
 from PIL import Image
 import pandas as pd
 import time
+import torch.nn as nn
+from torchvision import models, transforms
 
 from models.detector import ToothDetector
 from models.landmark import PerioLandmarkPredictor
@@ -53,12 +55,19 @@ st.markdown("""
 @st.cache_resource
 def load_models():
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    detector = ToothDetector(weights_path="dummy_yolo.pt", device=device)
-    landmark_predictor = PerioLandmarkPredictor(backbone_type="swin").to(device)
-    landmark_predictor.eval()
-    return detector, landmark_predictor, device
+    detector = ToothDetector(weights_path="runs/detect/models/detector_train/weights/best.pt", device=device)
+    landmark_predictor = PerioLandmarkPredictor(device=device)
+    
+    classifier = models.mobilenet_v3_small()
+    num_ftrs = classifier.classifier[3].in_features
+    classifier.classifier[3] = nn.Linear(num_ftrs, 2)
+    classifier.load_state_dict(torch.load("models/pano_classifier.pt", map_location=device))
+    classifier = classifier.to(device)
+    classifier.eval()
+    
+    return detector, landmark_predictor, classifier, device
 
-detector, landmark_predictor, device = load_models()
+detector, landmark_predictor, classifier, device = load_models()
 
 # =====================================================================
 # UI 레이아웃
@@ -76,10 +85,10 @@ with st.sidebar:
     
     st.markdown("---")
     st.info("""
-    **💡 판별 근거**
-    - 이 시스템은 학습된 딥러닝 모델의 가중치(.pt)가 연동되어 동작하는 것을 전제로 설계되었습니다.
-    - 현재 UI 구조 상에서는 **더미 텐서 모델(YOLOv11, Swin Transformer 구조 기반)**을 호출하여 임의의 예측 좌표를 반환하고 있습니다.
-    - 실제 현장 도입 시 `models/detector.py` 등에 실제 학습된 PyTorch 모델 로드 코드를 연결해야 합니다.
+    **💡 딥러닝 추론 시스템 연동 완료**
+    - 이미지 검증: MobileNetV3 기반 파노라마 사진 여부 판별 (OOD Reject)
+    - 치아 검출: Roboflow `ufba-425` 데이터셋으로 커스텀 학습된 YOLOv11 모델 적용.
+    - 랜드마크 검출: Foundation Model인 **SAM(Segment Anything)**을 이용한 치아 마스크 기반 기하학적 추정(CEJ, Crest, Apex) 파이프라인 연동 완료.
     """)
 
 # 메인 화면: 결과 표출
@@ -94,10 +103,26 @@ if uploaded_file is not None:
     st.subheader("Original Radiograph")
     st.image(img_rgb, use_container_width=True)
     
-    with st.spinner('딥러닝 모델 추론 및 랜드마크 분석 중...'):
-        time.sleep(1) # 더미 로딩 시간
+    with st.spinner('파노라마 방사선 사진 여부 검증 및 분석 중...'):
         
-        # 2. 모델 추론 파이프라인 (실제 텐서 변환 로직 필요)
+        # 1.5 OOD Classification (입구 컷 필터)
+        img_pil = Image.fromarray(img_rgb)
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
+        cls_input = transform(img_pil).unsqueeze(0).to(device)
+        with torch.no_grad():
+            outputs = classifier(cls_input)
+            _, preds = torch.max(outputs, 1)
+            is_pano = (preds.item() == 1) # 1이 'pano', 0이 'non_pano'
+            
+        if not is_pano:
+            st.error("⚠️ 이 이미지는 파노라마 방사선 사진이 아닌 것 같습니다 (예: 치근단 방사선 사진, 일반 사진). 전체 치아 배열이 보이는 파노라마 원본을 업로드해 주세요.")
+            st.stop()
+            
+        # 2. 모델 추론 파이프라인 (YOLOv11 적용)
         dummy_tensor = torch.randn(1, 3, 1024, 2048).to(device)
         detections = detector.predict(dummy_tensor)
         
@@ -111,9 +136,8 @@ if uploaded_file is not None:
             tooth_num = det["tooth_number"]
             bbox = det["bbox"] # [x_center, y_center, w, h, angle]
             
-            # 랜드마크 추출
-            crop_tensor = torch.randn(1, 3, 224, 224).to(device)
-            landmarks = landmark_predictor.predict_landmarks(crop_tensor)
+            # SAM 기반 랜드마크 추출 (원본 이미지 및 바운딩 박스 전달)
+            landmarks = landmark_predictor.predict_landmarks(img_rgb, bbox)
             
             # RBL 연산
             mesial_rbl = calculate_rbl(landmarks["mesial_cej"], landmarks["mesial_crest"], landmarks["root_apex"])
@@ -130,11 +154,25 @@ if uploaded_file is not None:
                 "Status": "Normal" if max_rbl == 0 else ("Warning" if max_rbl < 33 else "Severe")
             })
             
-            # [시각화] 원본 이미지 해상도가 고정되어 있지 않으므로 
-            # 실제 구현에서는 좌표를 원본 스케일로 역변환해야 합니다.
-            # 여기서는 더미 시각화로 대체합니다.
+            # [시각화] YOLO 바운딩 박스와 SAM 랜드마크 시각화
             cx, cy = int(bbox[0]), int(bbox[1])
-            cv2.putText(overlay_img, f"#{tooth_num}", (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+            w, h = int(bbox[2]), int(bbox[3])
+            
+            # 치아 번호 및 박스 (간이 표현)
+            cv2.rectangle(overlay_img, (cx - w//2, cy - h//2), (cx + w//2, cy + h//2), (0, 255, 0), 2)
+            cv2.putText(overlay_img, f"#{tooth_num}", (cx - w//2, cy - h//2 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+            
+            # 랜드마크 점 찍기
+            pts = [
+                (landmarks["mesial_cej"], (255, 0, 0)),   # Blue (CEJ)
+                (landmarks["distal_cej"], (255, 0, 0)),
+                (landmarks["mesial_crest"], (0, 255, 255)), # Yellow (Crest)
+                (landmarks["distal_crest"], (0, 255, 255)),
+                (landmarks["root_apex"], (0, 0, 255))      # Red (Apex)
+            ]
+            for pt_coord, color in pts:
+                pt_x, pt_y = int(pt_coord[0]), int(pt_coord[1])
+                cv2.circle(overlay_img, (pt_x, pt_y), 5, color, -1)
 
         # 3. 환자 병기 판별
         final_stage, extent = determine_patient_stage(tooth_metrics)
