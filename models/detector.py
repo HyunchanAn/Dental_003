@@ -9,6 +9,7 @@ Oriented Bounding Box(OBB) 좌표 및 신뢰도 점수를 반환합니다.
 import torch
 import numpy as np
 from typing import List, Dict, Union
+from ultralytics import YOLO
 
 class ToothDetector:
     def __init__(self, weights_path: str, device: str = "cuda" if torch.cuda.is_available() else "cpu"):
@@ -20,18 +21,14 @@ class ToothDetector:
             device: 실행 디바이스 (cuda 또는 cpu)
         """
         self.device = device
-        # 향후 ultralytics YOLOv11을 로드하는 가상의 코드
-        # self.model = YOLO(weights_path).to(self.device)
-        # self.model.conf = 0.45  # NMS confidence threshold
-        # self.model.iou = 0.45   # NMS IoU threshold 방지를 통해 겹치는 치아 이중검출 방지
-        pass
+        self.model = YOLO(weights_path).to(self.device)
 
-    def predict(self, image_tensor: torch.Tensor) -> List[Dict[str, Union[int, List[float], float]]]:
+    def predict(self, image: Union[np.ndarray, str]) -> List[Dict[str, Union[int, List[float], float]]]:
         """
-        방사선 영상 텐서를 입력받아 OBB 치아 검출 결과를 반환합니다.
+        방사선 영상을 입력받아 치아 검출 결과를 반환합니다.
         
         Args:
-            image_tensor: [1, 3, H, W] 형태의 입력 이미지 텐서 (FP16/FP32)
+            image: numpy array (RGB) 또는 이미지 경로
             
         Returns:
             List of dictionary containing:
@@ -39,22 +36,8 @@ class ToothDetector:
               - bbox: [x_center, y_center, width, height, angle]
               - confidence: 신뢰도 (float)
         """
-        # 임시 반환 형식. 실제 모델 인퍼런스 및 후처리 로직 대체
-        # results = self.model(image_tensor)
-        # return self._postprocess(results)
-        
-        return [
-            {
-                "tooth_number": 11,
-                "bbox": [500.0, 300.0, 45.0, 120.0, 5.0],
-                "confidence": 0.98
-            },
-            {
-                "tooth_number": 41,
-                "bbox": [505.0, 600.0, 40.0, 110.0, -2.0],
-                "confidence": 0.96
-            }
-        ]
+        results = self.model(image, conf=0.45, iou=0.45, verbose=False)
+        return self._postprocess(results)
 
     def _postprocess(self, model_outputs) -> List[Dict[str, Union[int, List[float], float]]]:
         """
@@ -63,5 +46,35 @@ class ToothDetector:
         오검출을 방지합니다.
         """
         parsed_results = []
-        # 파싱 로직 구현...
+        for result in model_outputs:
+            if result.boxes is None and (not hasattr(result, 'obb') or result.obb is None):
+                continue
+                
+            # OBB 포맷
+            if hasattr(result, 'obb') and result.obb is not None:
+                boxes = result.obb.xywhr.cpu().numpy() # [x, y, w, h, angle]
+                confs = result.obb.conf.cpu().numpy()
+                classes = result.obb.cls.cpu().numpy()
+            else:
+                boxes = result.boxes.xywh.cpu().numpy() # [x, y, w, h]
+                boxes = np.concatenate([boxes, np.zeros((boxes.shape[0], 1))], axis=1) # angle 0.0 추가
+                confs = result.boxes.conf.cpu().numpy()
+                classes = result.boxes.cls.cpu().numpy()
+                
+            names = result.names
+            
+            for i in range(len(boxes)):
+                class_id = int(classes[i])
+                class_name = names[class_id]
+                
+                try:
+                    tooth_number = int(class_name)
+                except ValueError:
+                    continue # 치아 번호가 아닌 클래스는 무시
+                    
+                parsed_results.append({
+                    "tooth_number": tooth_number,
+                    "bbox": boxes[i].tolist(),
+                    "confidence": float(confs[i])
+                })
         return parsed_results

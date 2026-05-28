@@ -19,6 +19,8 @@ from models.detector import ToothDetector
 from models.landmark import PerioLandmarkPredictor
 from utils.geometry import calculate_rbl
 from services.staging import determine_patient_stage, Stage, Extent
+from utils.calibration import CalibrationManager
+import onnxruntime as ort
 
 # =====================================================================
 # 페이지 설정 및 CSS
@@ -54,20 +56,38 @@ st.markdown("""
 # =====================================================================
 @st.cache_resource
 def load_models():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    detector = ToothDetector(weights_path="runs/detect/models/detector_train/weights/best.pt", device=device)
+    # GPU 점유 문제를 우회하기 위해 기본적으로 CPU 모드를 강제합니다. (Issue 3 / GPU 미사용 요구조건)
+    device = "cpu"
+    
+    # YOLO ONNX 지원 (ONNX 파일이 있으면 사용, 없으면 pt 로드)
+    # 실제 환경에서는 export 된 onnx 경로를 넣어야 하나, 기본 pt 경로를 유지하되 onnx가 있으면 교체하는 방식 가능.
+    # 여기서는 ONNX 강제(이슈 3)를 위해 경로를 onnx로 가정
+    detector = ToothDetector(weights_path="runs/detect/models/detector_train/weights/best.onnx", device=device)
+    # 파일이 없을 경우 대비 fallback (단순화)
+    import os
+    if not os.path.exists("runs/detect/models/detector_train/weights/best.onnx"):
+        detector = ToothDetector(weights_path="runs/detect/models/detector_train/weights/best.pt", device=device)
+        
     landmark_predictor = PerioLandmarkPredictor(device=device)
     
-    classifier = models.mobilenet_v3_small()
-    num_ftrs = classifier.classifier[3].in_features
-    classifier.classifier[3] = nn.Linear(num_ftrs, 2)
-    classifier.load_state_dict(torch.load("models/pano_classifier.pt", map_location=device))
-    classifier = classifier.to(device)
-    classifier.eval()
+    # ONNX 런타임으로 MobileNetV3 로드 시도
+    classifier_onnx_path = "models/pano_classifier.onnx"
+    if os.path.exists(classifier_onnx_path):
+        providers = ['OpenVINOExecutionProvider', 'CPUExecutionProvider']
+        classifier = ort.InferenceSession(classifier_onnx_path, providers=providers)
+        classifier_type = "onnx"
+    else:
+        classifier = models.mobilenet_v3_small()
+        num_ftrs = classifier.classifier[3].in_features
+        classifier.classifier[3] = nn.Linear(num_ftrs, 2)
+        classifier.load_state_dict(torch.load("models/pano_classifier.pt", map_location=device))
+        classifier = classifier.to(device)
+        classifier.eval()
+        classifier_type = "pytorch"
     
-    return detector, landmark_predictor, classifier, device
+    return detector, landmark_predictor, classifier, classifier_type, device
 
-detector, landmark_predictor, classifier, device = load_models()
+detector, landmark_predictor, classifier, classifier_type, device = load_models()
 
 # =====================================================================
 # UI 레이아웃
@@ -84,11 +104,17 @@ with st.sidebar:
     )
     
     st.markdown("---")
+    st.header("Calibration Settings")
+    st.info("실제 물리적 거리(mm) 산출을 위한 스케일 팩터를 입력하세요.")
+    pixels_per_mm = st.number_input("Pixels per mm", min_value=0.1, value=10.0, step=0.1)
+    calibrator = CalibrationManager(pixels_per_mm=pixels_per_mm)
+    
+    st.markdown("---")
     st.info("""
     **💡 딥러닝 추론 시스템 연동 완료**
-    - 이미지 검증: MobileNetV3 기반 파노라마 사진 여부 판별 (OOD Reject)
-    - 치아 검출: Roboflow `ufba-425` 데이터셋으로 커스텀 학습된 YOLOv11 모델 적용.
-    - 랜드마크 검출: Foundation Model인 **SAM(Segment Anything)**을 이용한 치아 마스크 기반 기하학적 추정(CEJ, Crest, Apex) 파이프라인 연동 완료.
+    - 이미지 검증: 파노라마 사진 여부 판별 (ONNX Runtime 적용)
+    - 치아 검출: YOLOv11 모델 적용. (ONNX Runtime)
+    - 랜드마크 검출: SAM + 2-Stage ROI Crop (OOM 방지 및 CPU 최적화)
     """)
 
 # 메인 화면: 결과 표출
@@ -112,19 +138,27 @@ if uploaded_file is not None:
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
-        cls_input = transform(img_pil).unsqueeze(0).to(device)
-        with torch.no_grad():
-            outputs = classifier(cls_input)
-            _, preds = torch.max(outputs, 1)
-            is_pano = (preds.item() == 1) # 1이 'pano', 0이 'non_pano'
+        cls_input = transform(img_pil).unsqueeze(0)
+        if classifier_type == "pytorch":
+            cls_input = cls_input.to(device)
+            with torch.no_grad():
+                outputs = classifier(cls_input)
+                _, preds = torch.max(outputs, 1)
+                is_pano = (preds.item() == 1) # 1이 'pano', 0이 'non_pano'
+        else:
+            # ONNX 추론
+            input_name = classifier.get_inputs()[0].name
+            ort_inputs = {input_name: cls_input.numpy()}
+            ort_outs = classifier.run(None, ort_inputs)
+            preds = np.argmax(ort_outs[0], axis=1)
+            is_pano = (preds[0] == 1)
             
         if not is_pano:
             st.error("⚠️ 이 이미지는 파노라마 방사선 사진이 아닌 것 같습니다 (예: 치근단 방사선 사진, 일반 사진). 전체 치아 배열이 보이는 파노라마 원본을 업로드해 주세요.")
             st.stop()
             
         # 2. 모델 추론 파이프라인 (YOLOv11 적용)
-        dummy_tensor = torch.randn(1, 3, 1024, 2048).to(device)
-        detections = detector.predict(dummy_tensor)
+        detections = detector.predict(img_rgb)
         
         tooth_metrics = []
         table_data = []
@@ -139,10 +173,16 @@ if uploaded_file is not None:
             # SAM 기반 랜드마크 추출 (원본 이미지 및 바운딩 박스 전달)
             landmarks = landmark_predictor.predict_landmarks(img_rgb, bbox)
             
-            # RBL 연산
+            # RBL 연산 (%)
             mesial_rbl = calculate_rbl(landmarks["mesial_cej"], landmarks["mesial_crest"], landmarks["root_apex"])
             distal_rbl = calculate_rbl(landmarks["distal_cej"], landmarks["distal_crest"], landmarks["root_apex"])
             max_rbl = max(mesial_rbl, distal_rbl)
+            
+            # 절대적 거리 연산 (mm) - Issue 1
+            mesial_loss_px = np.sqrt((landmarks["mesial_cej"][0] - landmarks["mesial_crest"][0])**2 + (landmarks["mesial_cej"][1] - landmarks["mesial_crest"][1])**2)
+            distal_loss_px = np.sqrt((landmarks["distal_cej"][0] - landmarks["distal_crest"][0])**2 + (landmarks["distal_cej"][1] - landmarks["distal_crest"][1])**2)
+            mesial_loss_mm = calibrator.pixel_to_mm(mesial_loss_px)
+            distal_loss_mm = calibrator.pixel_to_mm(distal_loss_px)
             
             tooth_metrics.append({"tooth": tooth_num, "max_rbl": max_rbl})
             
@@ -151,6 +191,7 @@ if uploaded_file is not None:
                 "Mesial RBL (%)": round(mesial_rbl, 1),
                 "Distal RBL (%)": round(distal_rbl, 1),
                 "Max RBL (%)": round(max_rbl, 1),
+                "Max Loss (mm)": round(max(mesial_loss_mm, distal_loss_mm), 2),
                 "Status": "Normal" if max_rbl == 0 else ("Warning" if max_rbl < 33 else "Severe")
             })
             

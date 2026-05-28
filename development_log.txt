@@ -52,3 +52,15 @@ Phase 5(OOD Classification Filter) 완료:
 [2026-05-24 10:25:00]
 - README.md 신규 작성 완료 및 프로젝트 전반의 아키텍처/주요 기능 명세.
 - 향후 핵심 과제(SAM 휴리스틱 개선, YOLO 모델 로직 정상화, 임상 Stage 판정 기능)를 Future Work 항목으로 상세히 기록함.
+
+[2026-05-24 23:06:00]
+- **Streamlit 기능 테스트 준비**: `app.py` 및 `models/detector.py`에 남아있던 더미(Dummy) 텐서 및 임시 리턴 코드 제거.
+- 실제 학습된 YOLOv11 가중치(`best.pt`)를 로드하여 업로드된 RGB 이미지 기반 실제 추론 파이프라인(Real Inference) 연동 완료.
+
+[2026-05-29 00:24:00]
+사용자의 지시(/goal)에 따라 GitHub Issue 1~4를 일괄 해결함:
+- Issue 1: `utils/calibration.py` 작성 및 `app.py` 스케일 팩터 UI 연동 완료 (절대적 mm 단위 골흡수 계산)
+- Issue 2: `utils/preprocess.py` 작성 (2-Stage ROI 패치 크롭) 및 `models/landmark.py` 좌표 복원 로직 구현 (OOM 방지)
+- Issue 3: `models/onnx_exporter.py` 작성 및 `app.py`에 ONNX Runtime 기반 CPU 추론 강제 적용 (GPU 점유 이슈 우회)
+- Issue 4: `tests/evaluator.py` 및 `tests/test_evaluator.py` 구현하여 MAE, R-squared 평가 매트릭스 확보. 모든 테스트(pytest) 통과 확인함.
+- 해당 변경사항들을 로컬에 반영하고 Git 커밋/푸시 및 관련 GitHub Issue Close 진행함.

@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import cv2
 from typing import Dict, Tuple
+from utils.preprocess import crop_roi
 
 try:
     from segment_anything import sam_model_registry, SamPredictor
@@ -54,15 +55,21 @@ class PerioLandmarkPredictor:
         """
         cx, cy, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
         
+        # 패치 기반 크롭 (Issue 2)
+        cropped_image, offset_x, offset_y = crop_roi(image_rgb, bbox, padding=20)
+        
+        local_cx = cx - offset_x
+        local_cy = cy - offset_y
+        
         # SAM은 [x_min, y_min, x_max, y_max] 포맷의 박스 프롬프트를 받습니다.
-        x_min = max(0, cx - w / 2)
-        y_min = max(0, cy - h / 2)
-        x_max = min(image_rgb.shape[1], cx + w / 2)
-        y_max = min(image_rgb.shape[0], cy + h / 2)
+        x_min = max(0, local_cx - w / 2)
+        y_min = max(0, local_cy - h / 2)
+        x_max = min(cropped_image.shape[1], local_cx + w / 2)
+        y_max = min(cropped_image.shape[0], local_cy + h / 2)
         input_box = np.array([x_min, y_min, x_max, y_max])
 
-        # SAM 이미지 인코딩
-        self.predictor.set_image(image_rgb)
+        # SAM 이미지 인코딩 (전체 이미지가 아닌 크롭 패치 인코딩)
+        self.predictor.set_image(cropped_image)
         
         # 마스크 추론
         masks, scores, _ = self.predictor.predict(
@@ -84,7 +91,7 @@ class PerioLandmarkPredictor:
         points = largest_contour.squeeze(1) # [N, 2]
         
         # 악궁 상하 위치 판단 (Maxillary vs Mandibular)
-        # 이미지의 위쪽 절반에 있으면 상악(뿌리가 위로 향함), 아래쪽에 있으면 하악(뿌리가 아래로 향함)
+        # 패치 기준이 아닌 원본 이미지 y_center 기준 판단
         img_h = image_rgb.shape[0]
         is_upper = cy < (img_h / 2)
         
@@ -109,16 +116,20 @@ class PerioLandmarkPredictor:
         cej_y_target = crown_y - 0.3 * total_length if is_upper else crown_y + 0.3 * total_length
         crest_y_target = crown_y - 0.4 * total_length if is_upper else crown_y + 0.4 * total_length
         
-        # 윤곽선 상에서 타겟 Y 좌표와 가장 가까운 좌/우 점 탐색
-        mesial_cej, distal_cej = self._find_left_right_points(points, cej_y_target, cx)
-        mesial_crest, distal_crest = self._find_left_right_points(points, crest_y_target, cx)
+        # 윤곽선 상에서 타겟 Y 좌표와 가장 가까운 좌/우 점 탐색 (기준은 로컬 cx)
+        mesial_cej, distal_cej = self._find_left_right_points(points, cej_y_target, local_cx)
+        mesial_crest, distal_crest = self._find_left_right_points(points, crest_y_target, local_cx)
         
+        # 크롭된 로컬 좌표를 원본 이미지의 글로벌 좌표로 복원
+        def to_global(pt):
+            return (float(pt[0] + offset_x), float(pt[1] + offset_y))
+            
         return {
-            "mesial_cej": mesial_cej,
-            "distal_cej": distal_cej,
-            "mesial_crest": mesial_crest,
-            "distal_crest": distal_crest,
-            "root_apex": (float(apex[0]), float(apex[1]))
+            "mesial_cej": to_global(mesial_cej),
+            "distal_cej": to_global(distal_cej),
+            "mesial_crest": to_global(mesial_crest),
+            "distal_crest": to_global(distal_crest),
+            "root_apex": to_global(apex)
         }
         
     def _find_left_right_points(self, points: np.ndarray, target_y: float, cx: float) -> Tuple[Tuple[float, float], Tuple[float, float]]:
