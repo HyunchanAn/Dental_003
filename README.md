@@ -7,12 +7,12 @@
 ### Architecture Diagram
 ```mermaid
 graph TD
-    A[Panorama X-Ray] --> B[MobileNetV3 OOD Filter]
-    B --> C[YOLOv11-OBB Tooth Detection]
-    C --> D[Segment Anything SAM]
-    D --> E[Geometry Heuristics CEJ/Crest/Apex]
-    E --> F[Bone Loss % Calculation]
-    F --> G[Streamlit UI Results]
+    A["Panorama X-Ray"] --> B["MobileNetV3 OOD Filter"]
+    B --> C["YOLOv11-OBB Tooth Detection"]
+    C --> D["Segment Anything SAM"]
+    D --> E["Geometry Heuristics CEJ/Crest/Apex"]
+    E --> F["Bone Loss % Calculation"]
+    F --> G["Streamlit UI Results"]
 ```
 ### Sequence Diagram
 ```mermaid
