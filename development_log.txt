@@ -64,3 +64,6 @@ Phase 5(OOD Classification Filter) 완료:
 - Issue 3: `models/onnx_exporter.py` 작성 및 `app.py`에 ONNX Runtime 기반 CPU 추론 강제 적용 (GPU 점유 이슈 우회)
 - Issue 4: `tests/evaluator.py` 및 `tests/test_evaluator.py` 구현하여 MAE, R-squared 평가 매트릭스 확보. 모든 테스트(pytest) 통과 확인함.
 - 해당 변경사항들을 로컬에 반영하고 Git 커밋/푸시 및 관련 GitHub Issue Close 진행함.
+
+2026-06-02 00:42:23
+- README.md에 아키텍처 다이어그램 및 순서도 일괄 추가, 이모티콘 제거
