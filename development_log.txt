@@ -70,3 +70,5 @@ Phase 5(OOD Classification Filter) 완료:
 
 2026-06-02 00:47:12
 - README.md 아키텍처 다이어그램 Mermaid 문법 오류(괄호 등 특수문자 따옴표 처리) 수정
+
+[2026-06-08 08:07] 가중치 배포 문제 해결: Hugging Face 연동 및 app.py 자동 다운로드 로직 추가

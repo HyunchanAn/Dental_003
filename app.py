@@ -59,19 +59,52 @@ def load_models():
     # GPU 점유 문제를 우회하기 위해 기본적으로 CPU 모드를 강제합니다. (Issue 3 / GPU 미사용 요구조건)
     device = "cpu"
     
+    # Hugging Face 설정 (본인의 repo_id로 변경 필요)
+    repo_id = "chemahc94/pano-boneloss-weights"
+    
+    def download_if_missing(file_path, hf_filename):
+        import os
+        from huggingface_hub import hf_hub_download
+        if not os.path.exists(file_path):
+            print(f"{hf_filename} 이 없습니다. Hugging Face에서 다운로드합니다...")
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            hf_hub_download(repo_id=repo_id, filename=hf_filename, local_dir=os.path.dirname(file_path))
+            # local_dir을 쓰면 파일명 그대로 해당 폴더에 다운로드됨
+    
+    # 모델 경로 정의
+    onnx_path = "runs/detect/models/detector_train/weights/best.onnx"
+    pt_path = "runs/detect/models/detector_train/weights/best.pt"
+    
+    # 파일 확인 및 다운로드
+    try:
+        download_if_missing(onnx_path, "best.onnx")
+    except Exception as e:
+        print(f"ONNX 파일 다운로드 실패: {e}")
+        
+    try:
+        download_if_missing(pt_path, "best.pt")
+    except Exception as e:
+        print(f"PT 파일 다운로드 실패: {e}")
+    
     # YOLO ONNX 지원 (ONNX 파일이 있으면 사용, 없으면 pt 로드)
-    # 실제 환경에서는 export 된 onnx 경로를 넣어야 하나, 기본 pt 경로를 유지하되 onnx가 있으면 교체하는 방식 가능.
-    # 여기서는 ONNX 강제(이슈 3)를 위해 경로를 onnx로 가정
-    detector = ToothDetector(weights_path="runs/detect/models/detector_train/weights/best.onnx", device=device)
-    # 파일이 없을 경우 대비 fallback (단순화)
     import os
-    if not os.path.exists("runs/detect/models/detector_train/weights/best.onnx"):
-        detector = ToothDetector(weights_path="runs/detect/models/detector_train/weights/best.pt", device=device)
+    if os.path.exists(onnx_path):
+        detector = ToothDetector(weights_path=onnx_path, device=device)
+    else:
+        detector = ToothDetector(weights_path=pt_path, device=device)
         
     landmark_predictor = PerioLandmarkPredictor(device=device)
     
     # ONNX 런타임으로 MobileNetV3 로드 시도
     classifier_onnx_path = "models/pano_classifier.onnx"
+    classifier_pt_path = "models/pano_classifier.pt"
+    
+    try:
+        download_if_missing(classifier_onnx_path, "pano_classifier.onnx")
+    except: pass
+    try:
+        download_if_missing(classifier_pt_path, "pano_classifier.pt")
+    except: pass
     if os.path.exists(classifier_onnx_path):
         providers = ['OpenVINOExecutionProvider', 'CPUExecutionProvider']
         classifier = ort.InferenceSession(classifier_onnx_path, providers=providers)
