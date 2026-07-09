@@ -2,6 +2,21 @@
 
 딥러닝을 활용하여 파노라마 방사선 사진에서 치아를 검출하고, 제로샷 기반 마스킹(SAM)을 통해 주요 랜드마크(CEJ, Crest, Apex)를 추출하여 치주염에 따른 치조골 소실량(RBL, Radiographic Bone Loss)을 자동으로 측정하는 AI 시스템입니다.
 
+
+
+## 📥 Dataset & Model Checkpoints Setup
+이 프로젝트는 대용량 데이터셋과 사전 학습된 모델 가중치(Checkpoints)가 필요합니다. 
+(GitHub에는 소스코드만 올라가 있습니다.)
+
+1. 프로젝트를 클론한 후, 먼저 `setup_env.py` 스크립트를 실행하여 데이터와 가중치를 허깅페이스에서 다운로드하세요.
+   ```bash
+   pip install huggingface_hub
+   python setup_env.py
+   ```
+2. **주의사항 (`.env` 파일):** 
+   이 프로젝트를 온전히 실행하기 위해서는 로컬 환경변수나 API 키가 포함된 `.env` 파일이 필요할 수 있습니다. 클론해서 사용하실 분은 레포지토리 주인에게 별도로 연락하여 `.env` 파일을 요청해 주시기 바랍니다.
+
+
 ## Technical Architecture & Workflow
 
 ### Architecture Diagram
