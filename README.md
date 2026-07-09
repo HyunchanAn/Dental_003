@@ -67,3 +67,26 @@ sequenceDiagram
   - `models/detector.py` 내부에 임시(Dummy)로 작성된 반환 코드를 실제 `self.model.predict` 결과로 교체하고, 중복 검출 방지를 위한 NMS 로직을 고도화해야 합니다.
 - **3. 임상 평가 및 Bone Loss 병기(Stage) 판정 추가**
   - 측정된 RBL(%) 수치를 바탕으로 실제 치주질환 진단 가이드라인(AAP/EFP Classification 등)에 따른 Stage I~IV 자동 분류 기능을 추가해야 합니다.
+
+## 모델 가중치 (Model Weights)
+학습된 모델 가중치는 Hugging Face Hub에서 자동으로 다운로드됩니다. 로컬에 가중치 파일이 없는 경우 앱 구동 시 자동 Fallback이 작동합니다.
+- **HF Repository**: [`chemahc94/pano-boneloss-weights`](https://huggingface.co/chemahc94/pano-boneloss-weights)
+- **파일 목록**:
+  - `best.pt` - YOLOv11-OBB 치아 검출 모델
+  - `pano_classifier.pt` - MobileNetV3 파노라마 OOD 분류기
+- **SAM 가중치**: Meta 공식 배포처에서 자동 다운로드 (`sam_vit_b_01ec64.pth`, 375MB)
+
+수동 다운로드가 필요한 경우:
+```python
+from huggingface_hub import hf_hub_download
+hf_hub_download(repo_id="chemahc94/pano-boneloss-weights", filename="best.pt", local_dir="runs/detect/models/detector_train/weights")
+hf_hub_download(repo_id="chemahc94/pano-boneloss-weights", filename="pano_classifier.pt", local_dir="models")
+```
+
+## 학습 데이터셋 출처 (Dataset Sources)
+- **UFBA-UESC Dental Images Deep Dataset (ufba-425)**: 브라질 UFBA/UESC 대학 공동 구축 파노라마 방사선 사진 공개 데이터셋. 425장의 치과 파노라마 X-ray에 대해 치아 단위 바운딩 박스 어노테이션이 제공됨. YOLOv11-OBB 치아 검출 모델의 훈련에 사용. [https://data.mendeley.com/datasets/hxt48yk462](https://data.mendeley.com/datasets/hxt48yk462)
+- **Segment Anything Model (SAM)**: Meta AI Research에서 공개한 범용 이미지 분할 파운데이션 모델. 치아 마스크 추출 및 랜드마크 기하학 분석에 활용. [https://github.com/facebookresearch/segment-anything](https://github.com/facebookresearch/segment-anything)
+
+## 라이선스 (License)
+MIT License
+

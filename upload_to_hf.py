@@ -3,7 +3,7 @@ from huggingface_hub import HfApi
 def upload_weights():
     # 1. 본인의 Hugging Face 토큰을 입력하세요. (또는 터미널에서 huggingface-cli login 실행)
     # 2. repo_id를 본인의 계정명/레포지토리명으로 변경하세요.
-    repo_id = "chemahc94/pano-boneloss-weights"
+    repo_id = "chemahc94/Dental_003"
     
     api = HfApi()
     
