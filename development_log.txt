@@ -52,3 +52,10 @@
 ## 2026-06-08
 - [08:07] 가중치 배포 문제 해결: Hugging Face 연동 및 app.py 자동 다운로드 로직 추가
 - [16:27:10] 배포 확인 (v1.0.0) 및 GitHub 릴리즈 (v1.0.0) 생성 완료.
+
+##### 2026-07-10 E2E Validation #####
+
+### E2E Validation 및 모델 평가 성공
+- Dental_000 통합 검증 계획에 따라 Dental_003의 단위 테스트(pytest) 수행 및 패스.
+- `reports_archive/260710_0850_Pano_BoneLoss_Measurement_E2E_Validation_Report.md` 보고서 작성 완료.
+- Dockerfile 신규 추가 및 CI/CD 워크플로우를 Docker 빌드까지 검증하도록 업데이트함.
