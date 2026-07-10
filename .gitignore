@@ -1,6 +1,6 @@
 /data
 /ufba-425-1
-/models
+*.pth
 .env
 *.pt
 /runs
