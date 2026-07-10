@@ -1,10 +1,12 @@
 # Pano Bone Loss Measurement
 
+![Status](https://img.shields.io/badge/Status-v1.0%20Release-brightgreen) ![Python](https://img.shields.io/badge/Python-3.12%2B-blue) ![Backend](https://img.shields.io/badge/Backend-YOLOv8-red) ![UI](https://img.shields.io/badge/UI-Streamlit-orange) ![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD%20Pipeline-passing-brightgreen?logo=github)
+
+
+## 개요
 딥러닝을 활용하여 파노라마 방사선 사진에서 치아를 검출하고, 제로샷 기반 마스킹(SAM)을 통해 주요 랜드마크(CEJ, Crest, Apex)를 추출하여 치주염에 따른 치조골 소실량(RBL, Radiographic Bone Loss)을 자동으로 측정하는 AI 시스템입니다.
 
-
-
-## 📥 Dataset & Model Checkpoints Setup
+## 설치 및 실행 방법
 이 프로젝트는 대용량 데이터셋과 사전 학습된 모델 가중치(Checkpoints)가 필요합니다. 
 (GitHub에는 소스코드만 올라가 있습니다.)
 
@@ -16,8 +18,7 @@
 2. **주의사항 (`.env` 파일):** 
    이 프로젝트를 온전히 실행하기 위해서는 로컬 환경변수나 API 키가 포함된 `.env` 파일이 필요할 수 있습니다. 클론해서 사용하실 분은 레포지토리 주인에게 별도로 연락하여 `.env` 파일을 요청해 주시기 바랍니다.
 
-
-## Technical Architecture & Workflow
+## 개요
 
 ### Architecture Diagram
 ```mermaid
@@ -45,7 +46,6 @@ sequenceDiagram
     Logic->>Logic: Find CEJ, Crest, Apex
     Logic-->>User: Show RBL % & Stage
 ```
-
 
 ##  Key Features
 - **OOD Rejection Filter**: MobileNetV3를 기반으로 입력 이미지가 파노라마인지 여부를 사전에 판별하여 치근단/일반 사진 등 잘못된 입력을 차단합니다.
