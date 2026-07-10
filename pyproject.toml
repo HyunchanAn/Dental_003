@@ -24,5 +24,6 @@ dependencies = [
     "uvicorn"
 ]
 
-[tool.setuptools]
-packages = ["models", "services", "utils", "api"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["models*", "services*", "utils*", "api*"]
