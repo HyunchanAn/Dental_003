@@ -12,13 +12,16 @@ except ImportError:
     print("WARNING: segment-anything 패키지가 설치되지 않았습니다. pip install git+https://github.com/facebookresearch/segment-anything.git 를 실행하세요.")
 
 class PerioLandmarkPredictor:
-    def __init__(self, device: str = "cuda"):
+    def __init__(self, device: str = "cuda", checkpoint_path: str = None):
         """
         SAM(Segment Anything Model) 기반 랜드마크 예측 모델을 초기화합니다.
+        Args:
+            device: 'cuda' 또는 'cpu'
+            checkpoint_path: SAM 가중치 경로. None이면 기본 경로(models/sam_vit_b_01ec64.pth) 사용.
         """
         self.device = device
         self.model_type = "vit_b"
-        self.checkpoint_path = "models/sam_vit_b_01ec64.pth"
+        self.checkpoint_path = checkpoint_path or "models/sam_vit_b_01ec64.pth"
         
         self._ensure_checkpoint_exists()
         
@@ -35,13 +38,14 @@ class PerioLandmarkPredictor:
             urllib.request.urlretrieve(url, self.checkpoint_path)
             print("Download complete.")
 
-    def predict_landmarks(self, image_rgb: np.ndarray, bbox: list) -> Dict[str, Tuple[float, float]]:
+    def predict_landmarks(self, image_rgb: np.ndarray, bbox: list, tooth_number: int = None) -> Dict[str, Tuple[float, float]]:
         """
         SAM을 이용하여 치아 마스크를 추출하고, 기하학적 휴리스틱을 통해 5개의 핵심 랜드마크를 추론합니다.
         
         Args:
             image_rgb: 원본 RGB 이미지 배열
             bbox: YOLOv11 OBB 포맷 [cx, cy, w, h, angle] 또는 일반 BBox
+            tooth_number: FDI 치아 번호. 상악/하악 판단에 사용됨.
             
         Returns:
             Dictionary of landmarks: 
@@ -91,9 +95,11 @@ class PerioLandmarkPredictor:
         points = largest_contour.squeeze(1) # [N, 2]
         
         # 악궁 상하 위치 판단 (Maxillary vs Mandibular)
-        # 패치 기준이 아닌 원본 이미지 y_center 기준 판단
-        img_h = image_rgb.shape[0]
-        is_upper = cy < (img_h / 2)
+        if tooth_number is not None:
+            is_upper = (10 <= tooth_number < 30) or (50 <= tooth_number < 70)
+        else:
+            img_h = image_rgb.shape[0]
+            is_upper = cy < (img_h / 2)
         
         if is_upper:
             # 상악: Root Apex는 Y 좌표가 가장 작은 점 (가장 위쪽)
