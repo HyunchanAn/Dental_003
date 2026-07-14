@@ -1,3 +1,4 @@
+![Hugging Face](https://img.shields.io/badge/Models-HuggingFace-yellow?logo=huggingface)
 # Pano Bone Loss Measurement
 
 ![Status](https://img.shields.io/badge/Status-v1.0%20Release-brightgreen) ![Python](https://img.shields.io/badge/Python-3.12%2B-blue) ![Backend](https://img.shields.io/badge/Backend-YOLOv8-red) ![UI](https://img.shields.io/badge/UI-Streamlit-orange) ![CI/CD Pipeline](https://img.shields.io/badge/CI%2FCD%20Pipeline-passing-brightgreen?logo=github)
@@ -5,6 +6,14 @@
 
 ## 개요
 딥러닝을 활용하여 파노라마 방사선 사진에서 치아를 검출하고, 제로샷 기반 마스킹(SAM)을 통해 주요 랜드마크(CEJ, Crest, Apex)를 추출하여 치주염에 따른 치조골 소실량(RBL, Radiographic Bone Loss)을 자동으로 측정하는 AI 시스템입니다.
+
+
+## 📦 Model Weights (Hugging Face)
+이 모듈의 학습된 가중치 모델은 Hugging Face 저장소에 연동되어 있습니다. 
+아래 링크에서 다운로드할 수 있습니다:
+- [Hugging Face Repository (chemahc94/Dental-AI-Models)](https://huggingface.co/chemahc94/Dental-AI-Models/tree/main/Dental_003)
+
+다운로드한 가중치 파일은 이 레포지토리의 해당 모델 폴더에 배치하여 사용하세요.
 
 ## 설치 및 실행 방법
 이 프로젝트는 대용량 데이터셋과 사전 학습된 모델 가중치(Checkpoints)가 필요합니다. 
