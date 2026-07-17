@@ -13,6 +13,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Checkout Central Tests
+      uses: actions/checkout@v4
+      with:
+        repository: HyunchanAn/Dental_000
+        path: Dental_000
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -34,7 +40,7 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}
       run: |
-        pytest tests/ -v
+        pytest Dental_000/tests_003 -v
 
   docker-build:
     runs-on: ubuntu-latest
