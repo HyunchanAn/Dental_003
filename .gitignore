@@ -5,3 +5,11 @@
 *.pt
 /runs
 __pycache__/
+
+# Security & Large Files
+data/
+*.zip
+*.rar
+*.pt
+*.pth
+.env
