@@ -21,7 +21,7 @@ class ToothDetector:
             device: 실행 디바이스 (cuda 또는 cpu)
         """
         self.device = device
-        self.model = YOLO(weights_path).to(self.device)
+        self.model = YOLO(weights_path)
 
     def predict(self, image: Union[np.ndarray, str]) -> List[Dict[str, Union[int, List[float], float]]]:
         """

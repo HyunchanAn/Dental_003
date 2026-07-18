@@ -6,6 +6,7 @@
 /runs
 __pycache__/
 
+<<<<<<< Updated upstream
 # Security & Large Files
 data/
 *.zip
@@ -13,3 +14,7 @@ data/
 *.pt
 *.pth
 .env
+=======
+*.onnx
+__pycache__/
+>>>>>>> Stashed changes
