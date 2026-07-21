@@ -107,3 +107,7 @@ hf_hub_download(repo_id="chemahc94/pano-boneloss-weights", filename="pano_classi
 ## 라이선스 (License)
 MIT License
 
+
+
+## 가중치 백업 안내
+오래된 이전 가중치 파일(Legacy Backups)은 통일성을 위해 Emergency_Weights_Vault/Dental_003/Backup_Checkpoints 폴더에 별도로 안전하게 보존되어 있습니다.
