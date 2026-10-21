@@ -13,7 +13,7 @@ def train_model():
         print("데이터 디렉토리가 없습니다. utils/prepare_classifier_data.py 를 먼저 실행하세요.")
         return
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     # 데이터 변환 (Data Augmentation & Normalization)

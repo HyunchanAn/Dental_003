@@ -1,4 +1,6 @@
 import os
+import os
+import torch
 from ultralytics import YOLO
 
 def train():
@@ -24,7 +26,7 @@ def train():
         epochs=100,
         imgsz=1024,
         batch=16,
-        device="cuda",
+        device="cuda" if torch.cuda.is_available() else "cpu",
         project="models",
         name="detector_train",
         amp=True  # Mixed Precision 사용으로 VRAM 및 속도 최적화

@@ -1,20 +1,22 @@
+# Data & Datasets
 /data
-/ufba-425-1
-*.pth
-.env
-*.pt
-/runs
-__pycache__/
-
-<<<<<<< Updated upstream
-# Security & Large Files
 data/
+/ufba-425-1
 *.zip
 *.rar
-*.pt
+
+# Model Weights & Exports
 *.pth
-.env
-=======
+*.pt
 *.onnx
+/runs
+runs/
+
+# Environment & Python Cache
+.env
 __pycache__/
->>>>>>> Stashed changes
+*.py[cod]
+*.pyc
+*.egg-info/
+dist/
+build/

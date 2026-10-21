@@ -1,11 +1,11 @@
-![Status](https://img.shields.io/badge/Status-v1.0%20Release-brightgreen "Status") ![Python](https://img.shields.io/badge/Python-3.11%2B-blue "Python") ![Backend](https://img.shields.io/badge/Backend-YOLOv8m--OBB%2BSAM--B-red "Backend") ![UI](https://img.shields.io/badge/UI-Streamlit%20%2F%20FastAPI-orange "UI") ![License](https://img.shields.io/badge/License-MIT-green "License")
+![Status](https://img.shields.io/badge/Status-Prototype%20(STANDBY)-yellow "Status") ![Python](https://img.shields.io/badge/Python-3.11%2B-blue "Python") ![Backend](https://img.shields.io/badge/Backend-YOLOv8m--OBB%2BSAM--B-red "Backend") ![UI](https://img.shields.io/badge/UI-Streamlit%20%2F%20FastAPI-orange "UI") ![License](https://img.shields.io/badge/License-MIT-green "License")
 
 # Pano Bone Loss Measurement (Dental_003)
 
 ## 개요
 > [학습 환경 사양] 실질적 모델 학습은 RTX 5080 + 라이젠9-6 9900X 환경에서 진행되었습니다.
 
-딥러닝을 활용하여 파노라마 방사선 사진에서 치아를 검출(`YOLOv8m-OBB` / `YOLOv11-OBB`)하고, 제로샷 기반 마스킹(`SAM ViT-B`) 및 기하학적 휴리스틱 규칙(`geometric_heuristic_30_40_rule`)을 통해 주요 랜드마크(CEJ, Alveolar Crest, Root Apex)를 추출하여 치주염에 따른 치조골 소실량(RBL, Radiographic Bone Loss)과 병기(AAP/EFP Stage I~IV)를 산출하는 AI 시스템입니다.
+딥러닝을 활용하여 파노라마 방사선 사진에서 치아를 검출(`YOLOv8m-OBB` / `YOLOv11-OBB`)하고, 제로샷 기반 마스킹(`SAM ViT-B`) 및 기하학적 휴리스틱 규칙(`geometric_heuristic_30_40_rule`)을 통해 주요 랜드마크(CEJ, Alveolar Crest, Root Apex)를 추출하여 치주염에 따른 치조골 소실량(RBL, Radiographic Bone Loss)과 병기(AAP/EFP Stage I~IV)를 산출하는 AI 프로토타입(`Prototype (STANDBY)`) 시스템입니다.
 
 ## Model Weights (Hugging Face)
 본 모듈의 학습된 가중치 모델은 Hugging Face 저장소에 연동되어 있습니다:
@@ -54,14 +54,21 @@ graph TD
 
 ### 벤치마크 및 검증 현황 (10-Case Verification Status)
 - 중앙 통합 테스트 스위트(`Dental_000/tests/tests_003`) 및 `Evaluator` 모듈을 통해 RBL 백분율 MAE, 랜드마크 좌표 MAE, R-squared 지표 및 AAP/EFP 2018 치주염 병기 판정(Stage I~IV, Localized/Generalized) 단위 검증(10케이스 시나리오 및 기하/병기 테스트)을 수행합니다.
-- 현재 랜드마크 추출은 SAM 마스크 + 30%/40% 휴리스틱 규칙에 기반하며, 전문의 수동 주석 Keypoint GT 대비 정밀 임상 회귀 벤치마크는 후속 과제로 분리되어 있습니다.
+- 현재 랜드마크 추출은 SAM 마스크 + 30%/40% 휴리스틱 규칙에 기반하는 프로토타입(`Prototype (STANDBY)`) 단계이며, 전문의 수동 주석 Keypoint GT 대비 정밀 임상 회귀 벤치마크는 후속 과제로 분리되어 있습니다.
 
-## 학습 데이터셋 출처 및 라이선스 (Dataset Sources & License)
-- [UFBA-UESC Dental Images Deep Dataset (`ufba-425` / Zenodo `4457648`)]:
-  - 브라질 UFBA/UESC 대학에서 구축·공개한 파노라마 방사선 데이터셋 (Zenodo Record `4457648`, Mendeley Data `hxt48yk462`).
-  - 데이터 라이선스: `CC BY 4.0` (Creative Commons Attribution 4.0 International).
-- [Segment Anything Model (SAM)]:
-  - Meta AI Research 공개 범용 분할 모델 (`Apache-2.0 License`).
+## 데이터셋 출처 및 다운로드 스크립트 구분 (Dataset Provenance & License)
+본 저장소는 용도에 따라 아래 3가지 데이터셋 경로 및 출처를 명확히 구분하여 관리합니다:
+
+1. [`scripts/download_dataset.py` - Zenodo `4457648` ("Panoramic radiography database")]:
+   - 기본 공개 다운로드 스크립트(`python scripts/download_dataset.py`)가 취득하는 데이터셋은 Zenodo Record `4457648` ("Panoramic radiography database", `Panoramic_radiography_database.zip`)입니다.
+   - 라이선스: `CC BY 4.0` (Creative Commons Attribution 4.0 International).
+2. [`scripts/download_dataset_roboflow.py` - Roboflow Universe (`teeth-segmentation/ufba-425`)]:
+   - YOLOv8/YOLOv11 포맷 전처리 라벨이 포함된 선택적(Optional) 다운로드 스크립트로, 실행 시 사용자 환경변수 `ROBOFLOW_API_KEY` 설정이 필요합니다.
+   - 다운로드 경로: `ufba-425-1/data.yaml` (`train_detector.py` 학습 입력용).
+3. [UFBA-UESC Dental Images Deep Dataset (`ufba-425` 원본 학술 벤치마크)]:
+   - Silva, Jader et al. (UFBA / UESC)이 구축한 파노라마 치아 분할 벤치마크 데이터셋으로, 원본 학술 데이터셋은 저자/기관 요청 기반(Request-based academic benchmark) 접근 정책을 따릅니다. 본 저장소는 원본 데이터를 직접 재배포하지 않습니다.
+4. [Segment Anything Model (SAM)]:
+   - Meta AI Research 공개 범용 분할 모델 (`Apache-2.0 License`).
 
 ## 코드 라이선스 (Code License)
 본 저장소의 소스 코드는 MIT License 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참고하십시오.

@@ -36,7 +36,7 @@ class ToothDetector:
               - bbox: [x_center, y_center, width, height, angle]
               - confidence: 신뢰도 (float)
         """
-        results = self.model(image, conf=0.45, iou=0.45, verbose=False)
+        results = self.model(image, conf=0.45, iou=0.45, device=self.device, verbose=False)
         return self._postprocess(results)
 
     def _postprocess(self, model_outputs) -> List[Dict[str, Union[int, List[float], float]]]:
