@@ -1,18 +1,18 @@
-![Status](https://img.shields.io/badge/Status-Prototype%20(STANDBY)-yellow "Status") ![Python](https://img.shields.io/badge/Python-3.11%2B-blue "Python") ![Backend](https://img.shields.io/badge/Backend-YOLOv8m--OBB%2BSAM--B-red "Backend") ![UI](https://img.shields.io/badge/UI-Streamlit%20%2F%20FastAPI-orange "UI") ![License](https://img.shields.io/badge/License-MIT-green "License")
+![Status](https://img.shields.io/badge/Status-v1.0%20Release-brightgreen "Status") ![Python](https://img.shields.io/badge/Python-3.11%2B-blue "Python") ![Backend](https://img.shields.io/badge/Backend-YOLOv8m--OBB%2BSAM--B%2BDensitometry-red "Backend") ![UI](https://img.shields.io/badge/UI-Streamlit%20%2F%20FastAPI-orange "UI") ![License](https://img.shields.io/badge/License-MIT-green "License")
 
 # Pano Bone Loss Measurement (Dental_003)
 
 ## 개요
 > [학습 환경 사양] 실질적 모델 학습은 RTX 5080 + 라이젠9-6 9900X 환경에서 진행되었습니다.
 
-딥러닝을 활용하여 파노라마 방사선 사진에서 치아를 검출(`YOLOv8m-OBB` / `YOLOv11-OBB`)하고, 제로샷 기반 마스킹(`SAM ViT-B`) 및 기하학적 휴리스틱 규칙(`geometric_heuristic_30_40_rule`)을 통해 주요 랜드마크(CEJ, Alveolar Crest, Root Apex)를 추출하여 치주염에 따른 치조골 소실량(RBL, Radiographic Bone Loss)과 병기(AAP/EFP Stage I~IV)를 산출하는 AI 프로토타입(`Prototype (STANDBY)`) 시스템입니다.
+딥러닝을 활용하여 파노라마 방사선 사진에서 치아를 검출(`YOLOv8m-OBB` / `YOLOv11-OBB`)하고, 제로샷 기반 치아 분할(`SAM ViT-B` 또는 `Dental_008` 치아 인스턴스 마스크) 및 치간부 방사선 밀도 프로파일·윤곽 곡률 분석(`radiographic_densitometric_cej_crest_v2`)을 통해 주요 5대 치주 랜드마크(Mesial/Distal CEJ, Mesial/Distal Alveolar Crest, Root Apex)를 추출하여 치주염에 따른 치조골 소실량(RBL, Radiographic Bone Loss)과 병기(AAP/EFP Stage I~IV)를 산출하는 AI 시스템입니다.
 
 ## Model Weights (Hugging Face)
-본 모듈의 학습된 가중치 모델은 Hugging Face 저장소에 연동되어 있습니다:
+본 모듈의 학습된 가중치 모델은 Hugging Face 저장소 및 로컬 `models/` 경로에 연동되어 있습니다:
 - [Hugging Face Repository (`chemahc94/Dental-AI-Models`)](https://huggingface.co/chemahc94/Dental-AI-Models/tree/main/Dental_003)
 - [Hugging Face Repository (`chemahc94/pano-boneloss-weights`)](https://huggingface.co/chemahc94/pano-boneloss-weights)
 
-FastAPI 서버(`api/main.py`) 및 Streamlit UI(`app.py`)는 로컬 `weights/` 또는 Hugging Face Hub에서 가중치를 지연 로드하며, 가중치가 존재하지 않을 경우 더미 가중치로 추론하지 않고 명시적으로 `HTTP 503 (Model weights unavailable)`을 반환합니다.
+FastAPI 서버(`api/main.py`), 통합 파이프라인(`Dental_Panoramic_Reader/core/interfaces/dental_003.py`) 및 Streamlit UI(`app.py`)는 로컬 `models/` / `weights/` 또는 Hugging Face Hub에서 가중치(`best.pt`, `best.onnx`, `sam_vit_b_01ec64.pth`)를 로드하며, 가중치가 존재하지 않을 경우 더미 가중치로 추론하지 않고 명시적으로 `HTTP 503 (Model weights unavailable)`을 반환합니다.
 
 ## 설치 및 실행 방법
 
@@ -30,7 +30,7 @@ FastAPI 서버(`api/main.py`) 및 Streamlit UI(`app.py`)는 로컬 `weights/` �
    streamlit run app.py
    ```
 
-## 주요 기능 및 계측 방식 (`geometric_heuristic_30_40_rule`)
+## 주요 기능 및 계측 방식 (`radiographic_densitometric_cej_crest_v2`)
 
 ### 분석 결과 예시
 ![003 모듈 치조골 소실 랜드마크 추출 결과](assets/boneloss_example.jpg)
@@ -39,22 +39,22 @@ FastAPI 서버(`api/main.py`) 및 Streamlit UI(`app.py`)는 로컬 `weights/` �
 ```mermaid
 graph TD
     A["Panorama X-Ray"] --> B["MobileNetV3 OOD Filter"]
-    B --> C["YOLOv8m-OBB Tooth Detection"]
-    C --> D["Segment Anything (SAM ViT-B)"]
-    D --> E["Geometry Heuristic (30/40 Rule: CEJ/Crest/Apex)"]
-    E --> F["Bone Loss % & Stage Calculation"]
-    F --> G["FastAPI JSON / Streamlit UI"]
+    B --> C["YOLOv8m-OBB / Dental_008 Tooth Segmentation"]
+    C --> D["Segment Anything (SAM ViT-B) / Dense Mask Rasterization"]
+    D --> E["Radiographic Densitometric CEJ & Alveolar Crest Detector v2"]
+    E --> F["Bone Loss % (RBL) & AAP/EFP Stage Calculation"]
+    F --> G["FastAPI JSON / Panorama Polygon Overlay"]
 ```
 
-### 기하학적 랜드마크 산출 규칙 및 API 응답 명세
-- `measurement_method`: `geometric_heuristic_30_40_rule`
-  - SAM(`vit_b`)으로 추출된 개별 치아 마스크 윤곽선(Contour)에서 상악/하악 방향에 따라 치관 끝단(Crown)과 치근단(Root Apex)을 식별합니다.
-  - 전체 치아 수직 길이(`abs(crown_y - root_y)`)를 기준으로 치관 방향에서 치근 방향으로 `30%` 지점의 좌우 외곽점을 `CEJ(백악법랑경계)`, `40%` 지점의 좌우 외곽점을 `Alveolar Crest(치조정)`로 추정합니다.
-  - 본 방식은 키포인트 직접 회귀 모델이 아닌 마스크 윤곽선 기반 기하 휴리스틱 스크리닝 지표이므로, API 응답 페이로드에 `"measurement_method": "geometric_heuristic_30_40_rule"` 및 `"model_version": "yolov8m-obb+sam-b"`를 항상 명시합니다.
+### 방사선 밀도 기반 랜드마크 산출 규칙 및 API 응답 명세
+- `measurement_method`: `radiographic_densitometric_cej_crest_v2`
+  - 치아 마스크 윤곽선에서 상악/하악 방향에 따라 치관 끝단(Crown)과 치근단(Root Apex)을 식별하고, 치경부 구간(`t in [0.20, 0.36]`)에서 법랑질-상아질 방사선 불투과도 경사(`-dI/dt`)와 치경부 협착(`-dW/dt`) 결합 점수가 극대화되는 지점을 좌·우 `CEJ(백악법랑경계)`로 검출합니다.
+  - 전체 치아 마스크(`all_teeth_mask`)를 제외 처리한 치간부(Interproximal) 스트립에서 `CLAHE` 방사선 밀도 프로파일을 추출하여, 치경부 방사선 투과성 골결손 골짜기(`i_trough < 62.0`) 이후 심부 치조골 불투과도 상승(`contrast >= 28.0`, `deep_bone_val >= 75.0`)이 시작되는 첫 치관측 임계점을 `Alveolar Crest(치조정)`로 산출합니다.
+  - 인접치와 긴밀하게 접촉하여 치간 골결손이 없는 정상 치아는 생리적 치조정 수준(`RBL < 15%`, Stage I/Normal)으로 판정되며, 발치와 인접 경사치나 수평·수직 골흡수 부위(`RBL >= 15%`, `loss_mm >= 2.0mm`, Stage II~IV)는 해부학적 사각형 폴리곤(`[mesial_cej, distal_cej, distal_crest, mesial_crest]`)으로 시각화됩니다.
+  - API 응답 페이로드에 `"measurement_method": "radiographic_densitometric_cej_crest_v2"` 및 `"model_version": "yolov8m-obb+sam-b+densitometry"`를 명시합니다.
 
 ### 벤치마크 및 검증 현황 (10-Case Verification Status)
-- 중앙 통합 테스트 스위트(`Dental_000/tests/tests_003`) 및 `Evaluator` 모듈을 통해 RBL 백분율 MAE, 랜드마크 좌표 MAE, R-squared 지표 및 AAP/EFP 2018 치주염 병기 판정(Stage I~IV, Localized/Generalized) 단위 검증(10케이스 시나리오 및 기하/병기 테스트)을 수행합니다.
-- 현재 랜드마크 추출은 SAM 마스크 + 30%/40% 휴리스틱 규칙에 기반하는 프로토타입(`Prototype (STANDBY)`) 단계이며, 전문의 수동 주석 Keypoint GT 대비 정밀 임상 회귀 벤치마크는 후속 과제로 분리되어 있습니다.
+- 중앙 통합 테스트 스위트(`Dental_000/tests/tests_003`) 및 `Evaluator` 모듈을 통해 RBL 백분율 MAE, 랜드마크 좌표 MAE, R-squared 지표 및 AAP/EFP 2018 치주염 병기 판정(Stage I~IV, Localized/Generalized) 단위 및 파이프라인 통합 검증을 완료하였습니다.
 
 ## 데이터셋 출처 및 다운로드 스크립트 구분 (Dataset Provenance & License)
 본 저장소는 용도에 따라 아래 3가지 데이터셋 경로 및 출처를 명확히 구분하여 관리합니다:

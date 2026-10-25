@@ -97,3 +97,4 @@
 
 2026-10-25
 - 전 시리즈 개발일지(`development_log.txt`) UTF-8 인코딩 복구 및 단일 표준 양식(`YYYY-MM-DD` 헤더 및 하이픈 불릿) 통일 완료.
+- `Dental_003` 실가중치(`best.pt`, `best.onnx`, `sam_vit_b_01ec64.pth`, `sam_vit_b_01ec64.onnx`) 서빙 배치 및 기존 고정 30%/40% 상수 휴리스틱을 치간부 방사선 밀도(`CLAHE`) 프로파일 및 치아 마스크 윤곽 곡률 분석 알고리즘(`radiographic_densitometric_cej_crest_v2`)으로 전면 고도화 완료 (`models/landmark.py`, `api/main.py`, `README.md`).

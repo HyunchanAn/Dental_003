@@ -183,8 +183,8 @@ async def _run_panoramic_inference(file: UploadFile) -> JSONResponse:
 
         return JSONResponse(content={
             "status": "success",
-            "measurement_method": "geometric_heuristic_30_40_rule",
-            "model_version": "yolov8m-obb+sam-b",
+            "measurement_method": "radiographic_densitometric_cej_crest_v2",
+            "model_version": "yolov8m-obb+sam-b+densitometry",
             "global_diagnosis": {
                 "stage": final_stage.value,
                 "extent": extent.value,
