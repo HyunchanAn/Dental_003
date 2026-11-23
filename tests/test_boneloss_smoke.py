@@ -12,9 +12,16 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from api.main import app
+from dental_core.schemas.panorama_contract import (
+    PanoramaHiTLDocument,
+    PanoramaImageMeta,
+    ToothAnnotation,
+)
 from models.landmark import PerioLandmarkPredictor
+from services.rbl_008_linker import measure_rbl_from_008_hitl_doc
 from services.staging import Extent, Stage, determine_patient_stage
-from utils.geometry import calculate_distance, calculate_rbl
+from utils.calibration import CalibrationManager
+from utils.geometry import calculate_axial_rbl, calculate_distance, calculate_rbl
 
 
 def test_geometry_distance_and_rbl():
@@ -89,3 +96,63 @@ def test_fastapi_predict_pano_smoke_and_503_handling():
         assert body["measurement_method"] == "radiographic_densitometric_cej_crest_v2"
         assert len(body["tooth_level_results"]) == 1
         assert body["tooth_level_results"][0]["tooth_number"] == 36
+
+
+def test_axial_rbl_projection_prevents_horizontal_offset_inflation():
+    # Vertical axis (0, 1): CEJ=(100, 100), Apex=(100, 200), Crest=(130, 120) -> horizontal offset 30px, axial loss 20px/100px = 20%
+    rbl_pct, loss_px, root_px = calculate_axial_rbl(
+        cej=(100.0, 100.0),
+        crest=(130.0, 120.0),
+        apex=(100.0, 200.0),
+        axis_unit_vec=[0.0, 1.0],
+    )
+    assert rbl_pct == pytest.approx(20.0)
+    assert loss_px == pytest.approx(20.0)
+    assert root_px == pytest.approx(100.0)
+    # Euclidean RBL would have been ~36.06% due to horizontal interproximal offset
+    assert calculate_rbl((100.0, 100.0), (130.0, 120.0), (100.0, 200.0)) > 35.0
+
+
+def test_measure_rbl_from_008_hitl_doc_calibrated_and_uncalibrated():
+    img_rgb = np.full((320, 480, 3), 45, dtype=np.uint8)
+    cv2.rectangle(img_rgb, (120, 80), (180, 140), (235, 235, 235), -1)
+    cv2.rectangle(img_rgb, (130, 140), (170, 230), (190, 190, 190), -1)
+    cv2.rectangle(img_rgb, (80, 175), (220, 250), (165, 165, 165), -1)
+
+    doc_cal = PanoramaHiTLDocument(
+        image_meta=PanoramaImageMeta(
+            filename="calibrated_pano.dcm",
+            width=480,
+            height=320,
+            source_format="DICOM",
+            pixel_spacing_mm=(0.08, 0.08),
+            is_calibrated=True,
+        ),
+        teeth=[
+            ToothAnnotation(
+                fdi=36,
+                bbox_xyxy=[120.0, 80.0, 180.0, 240.0],
+                polygon_px=[[120, 80], [180, 80], [170, 230], [150, 240], [130, 230], [120, 140]],
+            ),
+            ToothAnnotation(
+                fdi=46,
+                bbox_xyxy=[300.0, 85.0, 355.0, 235.0],
+                restoration_tags=["Implant"],
+            ),
+        ],
+    )
+
+    res_cal = measure_rbl_from_008_hitl_doc(img_rgb, doc_cal)
+    assert res_cal["mm_calibrated"] is True
+    assert res_cal["pixels_per_mm"] == pytest.approx(12.5)
+    assert res_cal["skipped_implant_fdi"] == [46]
+    assert len(res_cal["teeth_metrics"]) == 1
+    assert res_cal["teeth_metrics"][0]["fdi"] == 36
+    assert res_cal["teeth_metrics"][0]["mm_calibrated"] is True
+    assert len(doc_cal.bone_loss) == 1
+    assert doc_cal.bone_loss[0].mm_calibrated is True
+
+    # Uncalibrated PNG fallback check
+    cal_mgr = CalibrationManager()
+    assert cal_mgr.set_scale_from_panorama_meta({"pixel_spacing_mm": None, "is_calibrated": False}) is False
+    assert cal_mgr.is_calibrated is False

@@ -98,3 +98,9 @@
 2026-10-25
 - 전 시리즈 개발일지(`development_log.txt`) UTF-8 인코딩 복구 및 단일 표준 양식(`YYYY-MM-DD` 헤더 및 하이픈 불릿) 통일 완료.
 - `Dental_003` 실가중치(`best.pt`, `best.onnx`, `sam_vit_b_01ec64.pth`, `sam_vit_b_01ec64.onnx`) 서빙 배치 및 기존 고정 30%/40% 상수 휴리스틱을 치간부 방사선 밀도(`CLAHE`) 프로파일 및 치아 마스크 윤곽 곡률 분석 알고리즘(`radiographic_densitometric_cej_crest_v2`)으로 전면 고도화 완료 (`models/landmark.py`, `api/main.py`, `README.md`).
+
+2026-11-23
+- 이슈 #9 해결 (`[P2] 008 치아·치조정 좌표 기반 RBL(치조골 소실) 계측 연동`):
+  - `utils/geometry.py`: `Dental_008` 치아 장축 단위벡터 정사영 기반 `calculate_axial_rbl`을 구현하여 경사치 수평 치간 오프셋에 의한 RBL 과대평가 방지.
+  - `utils/calibration.py` 및 `services/rbl_008_linker.py`: `Dental_Core` `PanoramaImageMeta.pixel_spacing_mm` / `is_calibrated` 연동(`mm_calibrated` 플래그 추적), `Implant` 치아 계측 제외 및 `PanoramaHiTLDocument.bone_loss` 자동 기록(`measure_rbl_from_008_hitl_doc`) 구현.
+  - 단위 테스트 `tests/test_boneloss_smoke.py` 확장 및 전체 통과 확인.

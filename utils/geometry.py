@@ -1,52 +1,83 @@
 """
 Geometry and Calculation Utilities for Pano_BoneLoss_Measurement.
-
-이 모듈은 방사선학적 랜드마크 사이의 거리 연산, 골소실(RBL) 퍼센티지 산출,
-그리고 픽셀-물리단위 변환 등의 수학적 연산을 제공합니다.
 """
 
 import math
-from typing import Tuple
+from typing import Optional, Sequence, Tuple
+
 
 def calculate_distance(point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
-    """
-    두 2D 좌표 간의 유클리드 거리를 계산합니다.
-    """
-    return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
+    """Calculate 2D Euclidean distance between two points."""
+    return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
 
-def calculate_rbl(cej: Tuple[float, float], crest: Tuple[float, float], apex: Tuple[float, float]) -> float:
+def calculate_rbl(
+    cej: Tuple[float, float], crest: Tuple[float, float], apex: Tuple[float, float]
+) -> float:
     """
-    치은-백악질 경계(CEJ), 치조골정(Crest), 치근단(Apex) 좌표를 기반으로 
-    방사선학적 골소실(RBL, Radiographic Bone Loss) 퍼센티지를 계산합니다.
-    
-    CEJ에서 Apex까지의 거리를 전체 치근 길이로, CEJ에서 Crest까지의 거리를 골소실 길이로 계산합니다.
-    만약 Crest가 CEJ보다 치관 측(coronal)에 위치할 경우 (음수 산출 시) 0.0%로 Clamping 처리합니다.
+    Compute Radiographic Bone Loss (RBL %) from CEJ, Alveolar Crest, and Root Apex.
+    Clamps negative coronal crest positions to 0.0% and caps at 100.0%.
     """
     root_length = calculate_distance(cej, apex)
     if root_length == 0:
-        raise ValueError("CEJ와 Apex가 동일한 위치에 있을 수 없습니다 (Root length is 0).")
-        
+        raise ValueError("CEJ and Apex cannot be identical (Root length is 0).")
+
     bone_loss_distance = calculate_distance(cej, crest)
-    
-    # CEJ-Crest 벡터와 CEJ-Apex 벡터의 내적을 확인하여 같은 방향인지 점검.
-    # 내적이 0 미만이면 Crest가 CEJ 기준 치관 방향에 있으므로 0% (정상) 처리
     vector_loss = (crest[0] - cej[0], crest[1] - cej[1])
     vector_root = (apex[0] - cej[0], apex[1] - cej[1])
-    
     dot_product = vector_loss[0] * vector_root[0] + vector_loss[1] * vector_root[1]
-    
     if dot_product < 0:
         return 0.0
-        
+
     rbl_percentage = (bone_loss_distance / root_length) * 100.0
     return min(100.0, rbl_percentage)
 
 
+def calculate_axial_rbl(
+    cej: Tuple[float, float],
+    crest: Tuple[float, float],
+    apex: Tuple[float, float],
+    axis_unit_vec: Optional[Sequence[float]] = None,
+) -> Tuple[float, float, float]:
+    """
+    Project CEJ->Crest and CEJ->Apex vectors onto the tooth's principal anatomical axis
+    (`crown -> apex` unit vector from Dental_008) so tilted teeth adjacent to extraction
+    spaces are not inflated by horizontal interproximal offsets.
+
+    Returns:
+        (rbl_percent, axial_loss_px, axial_root_px)
+    """
+    vec_root = (float(apex[0]) - float(cej[0]), float(apex[1]) - float(cej[1]))
+    vec_loss = (float(crest[0]) - float(cej[0]), float(crest[1]) - float(cej[1]))
+
+    if axis_unit_vec is not None and len(axis_unit_vec) >= 2:
+        ux, uy = float(axis_unit_vec[0]), float(axis_unit_vec[1])
+        norm = math.hypot(ux, uy)
+        if norm > 1e-6:
+            ux, uy = ux / norm, uy / norm
+            # Ensure unit vector points from CEJ toward Apex
+            if (vec_root[0] * ux + vec_root[1] * uy) < 0:
+                ux, uy = -ux, -uy
+        else:
+            axis_unit_vec = None
+
+    if axis_unit_vec is None:
+        euclid_root = math.hypot(vec_root[0], vec_root[1])
+        if euclid_root <= 1e-6:
+            raise ValueError("CEJ and Apex cannot be identical (Root length is 0).")
+        ux, uy = vec_root[0] / euclid_root, vec_root[1] / euclid_root
+
+    axial_root_px = vec_root[0] * ux + vec_root[1] * uy
+    if axial_root_px <= 1e-6:
+        raise ValueError("Projected axial root length must be positive.")
+
+    axial_loss_px = max(0.0, vec_loss[0] * ux + vec_loss[1] * uy)
+    rbl_pct = min(100.0, max(0.0, (axial_loss_px / axial_root_px) * 100.0))
+    return (round(rbl_pct, 2), round(axial_loss_px, 2), round(axial_root_px, 2))
+
+
 def pixel_to_mm(pixel_distance: float, pixels_per_mm: float) -> float:
-    """
-    픽셀 거리를 물리적 밀리미터(mm) 단위로 변환합니다.
-    """
+    """Convert pixel distance to physical millimeters."""
     if pixels_per_mm <= 0:
-        raise ValueError("pixels_per_mm은 0보다 커야 합니다.")
+        raise ValueError("pixels_per_mm must be positive.")
     return pixel_distance / pixels_per_mm

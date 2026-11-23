@@ -33,6 +33,9 @@ graph TD
 - 전체 치아 마스크(`all_teeth_mask`)를 제외 처리한 치간부(Interproximal) 스트립에서 `CLAHE` 방사선 밀도 프로파일을 추출하여, 치경부 방사선 투과성 골결손 골짜기(`i_trough < 62.0`) 이후 심부 치조골 불투과도 상승(`contrast >= 28.0`, `deep_bone_val >= 75.0`)이 시작되는 첫 치관측 임계점을 `Alveolar Crest(치조정)`로 산출합니다.
 - 인접치와 긴밀하게 접촉하여 치간 골결손이 없는 정상 치아는 생리적 치조정 수준(`RBL < 15%`, Stage I/Normal)으로 판정되며, 발치와 인접 경사치나 수평·수직 골흡수 부위(`RBL >= 15%`, `loss_mm >= 2.0mm`, Stage II~IV)는 해부학적 사각형 폴리곤(`[mesial_cej, distal_cej, distal_crest, mesial_crest]`)으로 시각화됩니다.
 - API 응답 페이로드에 `"measurement_method": "radiographic_densitometric_cej_crest_v2"` 및 `"model_version": "yolov8m-obb+sam-b+densitometry"`를 명시합니다.
+- [`Dental_008` 치아 장축 정사영 및 `Dental_Core` 스케일 메타데이터 연동 (`services/rbl_008_linker.py`)]:
+  - `calculate_axial_rbl` (`utils/geometry.py`): 발치와 인접 경사치에서 수평 치간 거리가 골소실률을 부풀리지 않도록 `Dental_008` 치아 주축 단위벡터(`compute_tooth_axis_and_apex`)에 CEJ-Crest 및 CEJ-Apex 벡터를 정사영하여 장축 RBL%를 산출합니다.
+  - `measure_rbl_from_008_hitl_doc`: `PanoramaImageMeta.pixel_spacing_mm`(`is_calibrated`)을 `CalibrationManager`와 연결하여 보정된 DICOM 물리 거리(`mm_calibrated=True`)와 비보정 명목 거리(`mm_calibrated=False`)를 구분 기록하고, `Implant` 수복 치아를 자연 치근 RBL 계측에서 분리합니다.
 
 ### 3. 모델 가중치 (Model Weights on Hugging Face)
 - [Hugging Face Repository (`chemahc94/Dental-AI-Models`)](https://huggingface.co/chemahc94/Dental-AI-Models/tree/main/Dental_003)
